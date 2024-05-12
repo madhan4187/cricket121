@@ -24,10 +24,15 @@ initilizeDbAndServer()
 
 const convertDbObjectToResponseObject = dbObject => {
   return {
-    movieId: dbObject.movie_id,
-    directorId: dbObject.director_id,
-    movieName: dbObject.movie_name,
-    leadActor: dbObject.lead_actor,
+    playerId: dbObject.player_id,
+    playerName: dbObject.player_name,
+    matchId: dbObject.match_id,
+    match: dbObject.match,
+    year: dbObject.year,
+    playerMatchId: dbObject.player_match_id,
+    score: dbObject.score,
+    fours: dbObject.fours,
+    sixes: dbObject.sixes,
   }
 }
 
@@ -36,7 +41,9 @@ app.get('/players/', async (request, response) => {
   FROM player_details
   ORDER BY player_id`
   const playerArray = await db.all(getPlayersQuery)
-  response.send(playerArray)
+  response.send(
+    playerArray.map(eachObj => convertDbObjectToResponseObject(eachObj)),
+  )
 })
 
 app.get('/players/:playerId/', async (request, response) => {
@@ -45,7 +52,7 @@ app.get('/players/:playerId/', async (request, response) => {
   FROM player_details
   WHERE player_id = ${playerId}`
   const player = await db.get(getPlayerQuery)
-  response.send(player)
+  response.send(convertDbObjectToResponseObject(player))
 })
 
 app.put('/players/:playerId/', async (request, response) => {
@@ -56,7 +63,7 @@ app.put('/players/:playerId/', async (request, response) => {
   SET player_name = '${playerName}'
   WHERE player_id = ${playerId}`
   const dbResponse = await db.run(updatePlayerQuery)
-  response.send('Movie Successfully Added')
+  response.send('Player Details Updated')
 })
 
 app.get('/matches/:matchId/', async (request, response) => {
@@ -65,7 +72,7 @@ app.get('/matches/:matchId/', async (request, response) => {
   FROM match_details
   WHERE match_id = ${matchId}`
   const matchDetail = await db.get(getMatchQuery)
-  response.send(matchDetail)
+  response.send(convertDbObjectToResponseObject(matchDetail))
 })
 
 app.get('/players/:playerId/matches', async (request, response) => {
@@ -75,15 +82,31 @@ app.get('/players/:playerId/matches', async (request, response) => {
   FROM match_details INNER JOIN player_match_score 
   WHERE player_id = ${playerId}`
   const playerMatchDetail = await db.all(getPlayerMatchQuery)
-  response.send(playerMatchDetail)
+  response.send(
+    playerMatchDetail.map(eachObj => convertDbObjectToResponseObject(eachObj)),
+  )
 })
 
 app.get('/matches/:matchId/players', async (request, response) => {
   const {matchId} = request.params
   const getPlayerMatcPlayerhQuery = `
-  SELECT player_match_score.match_id, player_match_score.match, player_details.year
-  FROM match_details INNER JOIN player_match_score 
+  SELECT DISTINCT player_details.player_id, player_details.player_name
+  FROM player_details INNER JOIN player_match_score 
   WHERE player_match_score.match_id = ${matchId}`
   const matchPlayerDetail = await db.all(getPlayerMatcPlayerhQuery)
-  response.send(matchPlayerDetail)
+  response.send(
+    matchPlayerDetail.map(eachObj => convertDbObjectToResponseObject(eachObj)),
+  )
 })
+
+app.get('/players/:playerId/playerScores', async (request, response) => {
+  const {playerId} = request.params
+  const getScoreDetailsQuery = `
+  SELECT player_details.player_id AS playerId,player_details.player_name AS playerName, SUM(player_match_score.score) AS totalScore, SUM(player_match_score.fours) AS totalFoures, SUM(player_match_score.sixes) AS totalSixes
+  FROM player_details INNER JOIN player_match_score
+  WHERE player_details.player_id = ${playerId}`
+  const scoreDetails = await db.get(getScoreDetailsQuery)
+  response.send(scoreDetails)
+})
+
+module.exports = app
